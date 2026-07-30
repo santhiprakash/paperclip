@@ -219,6 +219,14 @@ export async function startServer(): Promise<StartedServer> {
     return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1";
   }
 
+  function isLocalAuthPublicBaseUrl(rawUrl: string): boolean {
+    try {
+      return isLoopbackHost(new URL(rawUrl).hostname);
+    } catch {
+      return false;
+    }
+  }
+
   function isPostgresConnectionString(connectionString: string): boolean {
     try {
       const parsed = new URL(connectionString);
@@ -250,11 +258,10 @@ export async function startServer(): Promise<StartedServer> {
       const parsed = new URL(rawUrl);
       // The URL API normalizes default ports like :80/:443 to "", so treat them as stable URLs.
       if (!parsed.port) return rawUrl;
-      // Only rewrite the port if the publicBaseUrl port matches the originally requested
-      // listen port — i.e., detectPort auto-shifted it. If the operator set a deliberately
-      // different port (e.g., a reverse proxy on :8443 while Paperclip listens on :3001),
-      // the publicBaseUrl must be preserved as-is.
-      if (requestedPort !== undefined && Number(parsed.port) !== requestedPort) {
+      // Only rewrite loopback URLs that still point at the originally requested listen port.
+      // Operator-configured public URLs on a real host should stay stable even if detectPort
+      // has to move the internal listener.
+      if (!isLoopbackHost(parsed.hostname) || requestedPort === undefined || Number(parsed.port) !== requestedPort) {
         return rawUrl;
       }
       parsed.port = String(detectedPort);
@@ -537,7 +544,7 @@ export async function startServer(): Promise<StartedServer> {
 
   const requestedListenPort = config.port;
   const listenPort = await detectPort(requestedListenPort);
-  if (config.authBaseUrlMode === "explicit" && config.authPublicBaseUrl) {
+  if (config.authBaseUrlMode === "explicit" && config.authPublicBaseUrl && isLocalAuthPublicBaseUrl(config.authPublicBaseUrl)) {
     config.authPublicBaseUrl = rewriteLocalUrlPort(config.authPublicBaseUrl, listenPort, requestedListenPort);
   }
   
