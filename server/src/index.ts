@@ -240,12 +240,7 @@ export async function startServer(): Promise<StartedServer> {
     if (config.deploymentMode !== "authenticated" || config.deploymentExposure !== "public") {
       return;
     }
-    if (!config.databaseUrl) {
-      throw new Error(
-        "authenticated public deployments require DATABASE_URL or config.database.connectionString; refusing embedded PostgreSQL fallback",
-      );
-    }
-    if (!isPostgresConnectionString(config.databaseUrl)) {
+    if (config.databaseUrl && !isPostgresConnectionString(config.databaseUrl)) {
       throw new Error(
         "authenticated public deployments require DATABASE_URL to be a postgres/postgresql connection string",
       );

@@ -154,8 +154,14 @@ vi.mock("detect-port", () => ({
 
 vi.mock("@paperclipai/db", () => ({
   createDb: createDbMock,
-  ensurePostgresDatabase: vi.fn(),
-  getPostgresDataDirectory: vi.fn(),
+  ensurePostgresDatabase: vi.fn(async () => "created"),
+  formatEmbeddedPostgresError: vi.fn((err: unknown) => err),
+  getPostgresDataDirectory: vi.fn(async () => "/tmp/paperclip-test-db"),
+  createEmbeddedPostgresLogBuffer: vi.fn(() => ({
+    append: vi.fn(),
+    getRecentLogs: vi.fn(() => []),
+  })),
+  prepareEmbeddedPostgresNativeRuntime: vi.fn(async () => undefined),
   inspectMigrations: vi.fn(async () => ({ status: "upToDate" })),
   applyPendingMigrations: vi.fn(),
   reconcilePendingMigrationHistory: vi.fn(async () => ({ repairedMigrations: [] })),
@@ -360,7 +366,7 @@ describe("startServer feedback export wiring", () => {
     expect(heartbeatServiceMock.reapOrphanedRuns).toHaveBeenCalledTimes(2);
   });
 
-  it("refuses authenticated public startup without an external database URL", async () => {
+  it("allows authenticated public startup with embedded PostgreSQL", async () => {
     loadConfigMock.mockReturnValue(buildTestConfig({
       deploymentExposure: "public",
       authBaseUrlMode: "explicit",
@@ -369,10 +375,12 @@ describe("startServer feedback export wiring", () => {
       databaseUrl: undefined,
     }));
 
-    await expect(startServer()).rejects.toThrow(
-      "authenticated public deployments require DATABASE_URL or config.database.connectionString",
-    );
-    expect(createDbMock).not.toHaveBeenCalled();
+    await expect(startServer()).resolves.toMatchObject({
+      host: "127.0.0.1",
+      listenPort: 3210,
+      databaseUrl: "postgres://paperclip:paperclip@127.0.0.1:54329/paperclip",
+    });
+    expect(createDbMock).toHaveBeenCalledWith("postgres://paperclip:paperclip@127.0.0.1:54329/paperclip");
   });
 
   it("refuses authenticated public startup when DATABASE_URL is not a postgres URL", async () => {
