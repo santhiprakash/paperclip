@@ -219,14 +219,6 @@ export async function startServer(): Promise<StartedServer> {
     return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1";
   }
 
-  function isLocalAuthPublicBaseUrl(rawUrl: string): boolean {
-    try {
-      return isLoopbackHost(new URL(rawUrl).hostname);
-    } catch {
-      return false;
-    }
-  }
-
   function isPostgresConnectionString(connectionString: string): boolean {
     try {
       const parsed = new URL(connectionString);
@@ -252,25 +244,6 @@ export async function startServer(): Promise<StartedServer> {
     }
   }
 
-  function rewriteLocalUrlPort(rawUrl: string | undefined, detectedPort: number, requestedPort?: number): string | undefined {
-    if (!rawUrl) return undefined;
-    try {
-      const parsed = new URL(rawUrl);
-      // The URL API normalizes default ports like :80/:443 to "", so treat them as stable URLs.
-      if (!parsed.port) return rawUrl;
-      // Only rewrite loopback URLs that still point at the originally requested listen port.
-      // Operator-configured public URLs on a real host should stay stable even if detectPort
-      // has to move the internal listener.
-      if (!isLoopbackHost(parsed.hostname) || requestedPort === undefined || Number(parsed.port) !== requestedPort) {
-        return rawUrl;
-      }
-      parsed.port = String(detectedPort);
-      return parsed.toString();
-    } catch {
-      return rawUrl;
-    }
-  }
-  
   const LOCAL_BOARD_USER_ID = "local-board";
   const LOCAL_BOARD_USER_EMAIL = "local@paperclip.local";
   const LOCAL_BOARD_USER_NAME = "Board";
@@ -544,9 +517,6 @@ export async function startServer(): Promise<StartedServer> {
 
   const requestedListenPort = config.port;
   const listenPort = await detectPort(requestedListenPort);
-  if (config.authBaseUrlMode === "explicit" && config.authPublicBaseUrl && isLocalAuthPublicBaseUrl(config.authPublicBaseUrl)) {
-    config.authPublicBaseUrl = rewriteLocalUrlPort(config.authPublicBaseUrl, listenPort, requestedListenPort);
-  }
   
   let authReady = config.deploymentMode === "local_trusted";
   let betterAuthHandler: RequestHandler | undefined;
