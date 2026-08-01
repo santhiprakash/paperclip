@@ -388,6 +388,7 @@ describe("startServer feedback export wiring", () => {
       deploymentExposure: "public",
       authBaseUrlMode: "explicit",
       authPublicBaseUrl: "https://tenant.example.com",
+      databaseMode: "postgres",
       databaseUrl: "secret://paperclip-cloud/stacks/alpha/database/runtime-url",
     }));
 
